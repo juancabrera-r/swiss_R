@@ -1,0 +1,286 @@
+---
+title: "swiss"
+author: "Juan Manuel Cabrera"
+date: "2023-08-09"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Objetivo del ejercicio**
+
+El objetivo del ejercicio es buscar un modelo que explique la variable fertiliy
+a partir de las otras variables.
+
+**Librerias**
+
+```{r}
+library(ggplot2)
+library(MASS)
+library(ppcor)
+library(GGally)
+library(relaimpo)
+library(car)
+library(patchwork)
+```
+
+
+**1. Carga dataframe**
+
+```{r}
+data <- swiss
+attach(data)
+data
+```
+
+2.0 Análisis de los datos
+
+```{r}
+str(data)
+```
+
+El dataset está formado por 47 observaciones y 6 variables.
+No se observa que sea necesario hacer alguna transformación de variable.
+
+2.1. Comprobamos si existen datos vacios
+```{r}
+sum(is.na(data))
+```
+No se observan datos vacios.
+
+**2.2. Visualizar los datos**
+
+
+```{r}
+plot(data)
+```
+
+1.3. Análisis Shapiro-Wilks
+
+```{r}
+shapiro.test(Agriculture)
+```
+Resultado: p-value > 0.05, rechazamos la hipótesis nula y aceptamos que existe normalidad con el 95% de confianza.
+
+```{r}
+shapiro.test(Examination)
+```
+Resultado: p-value > 0.05, existe normalidad.
+
+
+```{r}
+shapiro.test(Education)
+```
+Resultado: p-value < 0.05, aceptamos la hipótesis nula, rechazamos normalidad.
+```{r}
+shapiro.test(Catholic)
+```
+Resultado: p-value < 0.05, rechazamos normalidad.
+```{r}
+shapiro.test(Infant.Mortality)
+```
+p-value = 0.05, aceptamos normalidad en los datos.
+
+**2.3. Correlación de Spearman**
+
+Analizamos la correlación entre las variables del dataframe.
+
+```{r}
+cor(data, method='spearman')
+```
+Se observan que existen correlaciones entre varias variables, aquellas correlaciones más significativas son las que se muestran en la siguiente tabla:
+
+Variable 1    | Variable 2    | Correlación
+--------------|---------------|-------------
+Examination   | Agriculture   | -0.5989
+Examination   | Eduaction     |  0.6746
+Examination   | Catholic      | -0.4751
+Education     | Agriculture   | -0.6504
+
+No se ha incluido las correlaciones con la variable Fertility ya que será nuestra variable independiente.
+
+A continuación se realizará la prueba de hipótesis para cada correlación de la tabla anterior.
+
+```{r}
+cor.test(Examination, Agriculture, methos='spearman')
+```
+S(45)=-6.3341, p<0.001, rs=-0.68654
+
+Con un nivel de significación del 95% se estima que existe una correlación entre la variable Examination y Agricultura, esta correlación es negativa.
+
+```{r}
+cor.test(Examination, Education , methos='spearman')
+```
+S(45) = 6.546, p<0.01, rs=0.6984
+
+Existe correlación positiva entre Examination y Education.
+
+```{r}
+cor.test(Examination, Catholic, method='spearman')
+```
+S(45) = 25513, p<0.01, rs=-0.471
+
+Existe correlación negativa y leve entre Examination y Catholic.
+
+```{r}
+cor.test(Education, Agriculture, method = 'spearman')
+```
+S(45) = 28546, p<0.01, rs=-0.6504
+
+Existe correlación negativa entre Education y Agriculture.
+
+
+```{r}
+ggpairs(data[,-1], progress=F)
+```
+
+**2. Modelo lineal**
+
+```{r}
+model <- lm(Fertility ~ Agriculture + Examination + Education + Catholic) 
+```
+
+```{r}
+summary(model)
+```
+**2.1. Función matemática**
+
+La función matemática que define el modelo es:
+
+$Fertility = \beta_0 + \beta_1 \cdot Agriculture + \beta_2 \cdot Examination + \beta_3 \cdot Education + \beta_4 \cdot Catholic + \beta_5 \cdot Infant.Mortality$
+
+Y sustituyendo los predictores tenemos:
+
+$Fertility = 66.915 - 0.172 \cdot Agriculture - 0.258 \cdot Examination -0.871 \cdot Education + 0.104 \cdot Catholic + 1.077 \cdot Infant.Mortality$
+
+**2.2. Análisis Bondad de Ajuste**
+
+**Prueba F global:**
+
+- F(5,41) = 19.76, p<0.001
+
+Como p<0.05 se rechaza la hipótesis nula, por lo que al menos uno de los predictores está relacionado con la respuesta.
+
+**Error estándar residual:**
+
+RSE = 7.165, existe un error de 7.165 en la media estandarizada de fertilidad.
+
+```{r}
+sigma(model)/mean(Fertility)*100
+```
+
+La tasa de error es del 10.22%.
+
+**Coeficiente de determinación:**
+
+R2 ajustado= 67.1% 
+
+El 67.1% de los datos pueden ser explicados por el modelo.
+
+**2.3. Generalización del modelo**
+
+Multicolinealidad
+
+```{r}
+vif(model)
+```
+Ninguno de los 3 valores es mayor que 5, por lo que la multicolinealidad no es un problema.
+
+**Importancia de los predictores**
+
+```{r}
+crlm <- calc.relimp(model,
+                    type=c("lmg"),
+                    rela=T)
+crlm
+```
+A continuación se muestra la importancia de cada variable:
+
+Variable    |   Importancia(%)
+------------|-------------------
+Agriculture |   10,14
+Examintaion |   27.8
+Education   |   43.19
+Catholic    |   18.85
+
+Se observa que la variable más influyente es la educación, y la menos influyente agricultura.
+
+
+**Intervalos de confianza**
+
+```{r}
+confint(model)
+```
+Valores de confianza:
+
+Predictores    |         Tramo
+---------------|---------------------
+Intercepto     |   [77.032 : 105.079]
+Agriculture    |   [-0.369 : -0.0721]
+Examination    |   [-0.814 : 0.293]  
+Education      |   [-1.354 : -0.569]    
+Catholic       |   [0.049 : 0.2]
+
+**Supuestos del modelo**
+
+```{r}
+par(mfrow = c(2,2))
+plot(model)
+```
+**Residuals vs fitted**: se observa que los residuos no presentan tendencia, por lo que podríamos decir que **existe linealidad**.
+
+**Q-Q Residuals**: las observaciones se encuentran a lo largo de la línea diagonal, por lo que podemos asumir que **existe el supuesto de normalidad**.
+
+
+**Scale-Location**: se observa que se **cumple el supuesto de homocedasticidad**.
+
+**Residuals vs Leverage**: no hay valores influyentes.
+
+
+**3. Predicciones**
+
+**3.1. Predicciones con valores existentes**
+
+Seleccionamos de forma aleatoria valores existente en el dataframe
+
+```{r}
+new_data <- data[c(3,8,21,26,42),]
+```
+
+Realizamos predicciones
+
+```{r}
+predict_data <- predict(model, new_data[,-1])
+predict_data
+```
+Ahora vamos a ver los residuos entre los valores reales y predichos
+
+```{r}
+data[c(3,8,21,26,42), 1] - predict_data 
+```
+Se observa que los valores que más se alejan son Glane (15.56) y Neuchatel(15.01).
+
+```{r}
+ggplot(data,aes(x=Education,y=Fertility))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  theme_minimal()+
+  geom_point(data = new_data, mapping = aes(x=new_data$Education, y=new_data$Fertility), color='green')+
+  geom_point(data = new_data, mapping = aes(x=new_data$Education, y=predict_data), color='red')
+
+
+```
+
+
+
+
+
+
+
+
+
+
